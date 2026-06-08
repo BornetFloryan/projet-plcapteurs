@@ -1,0 +1,128 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+\geometry{top=1.4cm,bottom=1.4cm,left=1.5cm,right=1.5cm}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\setlist[itemize]{noitemsep, topsep=1pt}
+\setlist[enumerate]{noitemsep, topsep=1pt}
+
+\title{\vspace{-1.2cm}\textbf{Rapport -- Problème d'activation de capteurs}}
+\author{Floryan BORNET -- Corentin BRENDLÉ}
+\date{Techniques d'optimisation}
+
+\begin{document}
+
+\maketitle
+\vspace{-0.8cm}
+
+\section{Construction des configurations élémentaires}
+
+Pour résoudre le problème, nous devons d'abord construire un ensemble de configurations élémentaires. Une configuration correspond à un ensemble de capteurs activés en même temps. Elle est valide si elle couvre toutes les zones à surveiller. Elle est élémentaire si elle est valide et si aucun capteur ne peut être retiré sans perdre la couverture complète.
+
+Tester toutes les combinaisons de capteurs serait trop coûteux, surtout pour les grandes instances. Nous avons donc choisi une heuristique gloutonne.
+
+La méthode utilisée est la suivante :
+
+\begin{enumerate}
+    \item on choisit un capteur de départ ;
+    \item on ajoute le capteur qui couvre le plus grand nombre de nouvelles zones non encore couvertes ;
+    \item on répète cette étape jusqu'à ce que toutes les zones soient couvertes ;
+    \item on obtient alors une configuration valide ;
+    \item on teste ensuite chaque capteur de cette configuration ;
+    \item si un capteur peut être retiré tout en gardant toutes les zones couvertes, alors il est supprimé.
+\end{enumerate}
+
+Cette dernière étape permet de transformer une configuration valide en configuration élémentaire.
+
+Dans notre programme, la fonction \texttt{couvre\_toutes\_les\_zones} vérifie si une configuration couvre toutes les zones. La fonction \texttt{rendre\_elementaire} supprime les capteurs inutiles. Enfin, la fonction \texttt{generer\_configurations} répète la construction en changeant le capteur de départ afin d'obtenir plusieurs configurations différentes.
+
+Cette méthode ne garantit pas de trouver toutes les configurations élémentaires possibles, mais elle permet d'obtenir rapidement un ensemble de configurations exploitables pour le programme linéaire.
+
+\section{Résolution du programme linéaire}
+
+Chaque configuration élémentaire générée est associée à une variable $t_i$. Cette variable représente le temps pendant lequel la configuration $u_i$ est activée.
+
+L'objectif est de maximiser la durée totale de surveillance :
+
+\[
+\max \sum_{i=1}^{k} t_i
+\]
+
+où $k$ est le nombre de configurations générées.
+
+Pour chaque capteur $s_j$, on ajoute une contrainte de durée de vie :
+
+\[
+\sum_{i : s_j \in u_i} t_i \leq T_j
+\]
+
+Ainsi, un capteur ne peut pas être utilisé plus longtemps que sa batterie ne le permet.
+
+Le programme linéaire est écrit automatiquement dans un fichier \texttt{programme.lp}, puis il est résolu avec GLPK. La solution indique la durée maximale obtenue et le temps d'activation de chaque configuration.
+
+\section{Solutions obtenues}
+
+Les tests ont été réalisés sur les instances fournies. Le tableau suivant présente, pour chaque instance, le nombre de capteurs, le nombre de zones, le nombre de configurations élémentaires générées et la durée de vie obtenue après résolution.
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+\textbf{Instance} & \textbf{Capteurs} & \textbf{Zones} & \textbf{Config.} & \textbf{Durée} \\
+\hline
+fichier-exemple & 4 & 3 & 4 & $8{,}5$ \\
+\hline
+moyen\_test\_3 & 10 & 10 & 15 & $395$ \\
+\hline
+moyen\_test\_2 & 20 & 10 & 21 & $104$ \\
+\hline
+gros\_test\_1 & 100 & 200 & 265 & $1668$ \\
+\hline
+maxi\_test\_1 & 1000 & 500 & 12985 & $13711$ \\
+\hline
+\end{tabular}
+\end{center}
+
+Pour l'instance d'exemple, la solution optimale théorique est de $8{,}5$ unités de temps lorsque les configurations élémentaires $(2,4)$, $(1,2)$, $(1,3)$ et $(1,4)$ sont utilisées. Cette instance permet de vérifier que la construction du programme linéaire et l'interprétation de la solution sont correctes.
+
+\section{Analyse des résultats}
+
+Les résultats montrent que la qualité de la solution dépend directement des configurations élémentaires générées. Si le nombre de configurations est trop faible, le solveur a peu de choix pour répartir l'utilisation des capteurs. La durée de vie obtenue peut donc être inférieure à la durée optimale réelle.
+
+À l'inverse, lorsque les configurations sont plus nombreuses et plus variées, le solveur dispose de davantage de possibilités. Il peut alors mieux répartir la consommation d'énergie entre les capteurs et augmenter la durée totale de surveillance.
+
+Cependant, ajouter trop de configurations augmente aussi la taille du programme linéaire. Le nombre de variables augmente, le fichier \texttt{programme.lp} devient plus grand et le temps de résolution peut augmenter. Il faut donc trouver un compromis entre la qualité de la solution et le temps de calcul.
+
+Notre heuristique gloutonne permet d'obtenir rapidement des configurations élémentaires. Elle est donc adaptée aux instances moyennes et grandes, même si elle ne garantit pas d'obtenir toutes les configurations possibles.
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Nombre de configurations} & \textbf{Durée obtenue} & \textbf{Observation} \\
+\hline
+Faible & généralement plus faible & peu de choix pour GLPK \\
+\hline
+Moyen & généralement améliorée & meilleur compromis \\
+\hline
+Élevé & potentiellement meilleure & solution parfois meilleure mais calcul plus long \\
+\hline
+\end{tabular}
+\end{center}
+
+\section{Conclusion}
+
+Le programme réalisé permet de lire une instance, de construire des configurations élémentaires, d'écrire le programme linéaire correspondant et de le résoudre avec GLPK. Les expérimentations montrent que le choix des configurations a une influence importante sur la durée de vie du réseau. Plus les configurations sont pertinentes et variées, meilleure peut être la solution obtenue.
+
+\end{document}
