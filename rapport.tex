@@ -1,5 +1,8 @@
 \documentclass[10pt,a4paper]{article}
 
+% =========================
+% Packages
+% =========================
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[french]{babel}
@@ -8,121 +11,138 @@
 \usepackage{array}
 \usepackage{booktabs}
 \usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{microtype}
 
-\geometry{top=1.4cm,bottom=1.4cm,left=1.5cm,right=1.5cm}
+% =========================
+% Mise en page
+% =========================
+\geometry{
+    top=1.6cm,
+    bottom=1.6cm,
+    left=1.7cm,
+    right=1.7cm
+}
+
 \setlength{\parindent}{0pt}
-\setlength{\parskip}{4pt}
-\setlist[itemize]{noitemsep, topsep=1pt}
-\setlist[enumerate]{noitemsep, topsep=1pt}
+\setlength{\parskip}{5pt}
 
-\title{\vspace{-1.2cm}\textbf{Rapport -- Problème d'activation de capteurs}}
+\setlist[itemize]{
+    noitemsep,
+    topsep=3pt,
+    leftmargin=7mm
+}
+
+\setlist[enumerate]{
+    noitemsep,
+    topsep=3pt,
+    leftmargin=8mm
+}
+
+% Espacement des titres
+\titlespacing*{\section}{0pt}{9pt}{5pt}
+
+% Style des titres
+\titleformat{\section}
+{\normalfont\large\bfseries}
+{\thesection}
+{0.6em}
+{}
+
+\pagestyle{empty}
+
+% =========================
+% Titre
+% =========================
+\title{\vspace{-0.8cm}\textbf{Problème d'activation de capteurs}}
 \author{Floryan BORNET -- Corentin BRENDLÉ}
 \date{Techniques d'optimisation}
 
 \begin{document}
 
 \maketitle
-\vspace{-0.8cm}
+\vspace{-0.5cm}
 
+% =========================================================
 \section{Construction des configurations élémentaires}
 
-Pour résoudre le problème, nous devons d'abord construire un ensemble de configurations élémentaires. Une configuration correspond à un ensemble de capteurs activés en même temps. Elle est valide si elle couvre toutes les zones à surveiller. Elle est élémentaire si elle est valide et si aucun capteur ne peut être retiré sans perdre la couverture complète.
+Une configuration correspond à un ensemble de capteurs activés en même temps. Elle est valide si elle couvre toutes les zones à surveiller. Elle est élémentaire si elle est valide et si aucun capteur ne peut être retiré sans perdre cette couverture.
 
-Tester toutes les combinaisons de capteurs serait trop coûteux, surtout pour les grandes instances. Nous avons donc choisi une heuristique gloutonne.
+Nous avons implémenté deux méthodes de construction des configurations élémentaires, choisies explicitement au lancement du programme avec l'option \texttt{--methode}.
 
-La méthode utilisée est la suivante :
+\textbf{Génération exacte.}
+Cette méthode teste toutes les combinaisons possibles de capteurs, puis conserve uniquement les configurations élémentaires. Une combinaison est gardée si elle couvre toutes les zones et si le retrait de n'importe lequel de ses capteurs rend la couverture incomplète. Cette méthode permet donc de fournir à GLPK toutes les configurations élémentaires, mais son coût augmente fortement car il peut y avoir jusqu'à $2^N-1$ combinaisons à tester.
 
-\begin{enumerate}
-    \item on choisit un capteur de départ ;
-    \item on ajoute le capteur qui couvre le plus grand nombre de nouvelles zones non encore couvertes ;
-    \item on répète cette étape jusqu'à ce que toutes les zones soient couvertes ;
-    \item on obtient alors une configuration valide ;
-    \item on teste ensuite chaque capteur de cette configuration ;
-    \item si un capteur peut être retiré tout en gardant toutes les zones couvertes, alors il est supprimé.
-\end{enumerate}
+\textbf{Heuristique gloutonne.}
+Cette méthode est utilisée pour obtenir rapidement des configurations sur les grandes instances. Pour chaque capteur de départ, le programme ajoute successivement le capteur qui couvre le plus grand nombre de nouvelles zones non encore couvertes. En cas d'égalité, deux variantes déterministes sont construites : l'une choisit le premier capteur ex æquo, l'autre le dernier. Une fois toutes les zones couvertes, les capteurs devenus inutiles sont supprimés et les doublons sont retirés.
 
-Cette dernière étape permet de transformer une configuration valide en configuration élémentaire.
+Cette méthode ne garantit pas de trouver toutes les configurations élémentaires, mais elle permet d'obtenir rapidement un ensemble de configurations exploitables lorsque la génération exacte devient trop coûteuse.
 
-Dans notre programme, la fonction \texttt{couvre\_toutes\_les\_zones} vérifie si une configuration couvre toutes les zones. La fonction \texttt{rendre\_elementaire} supprime les capteurs inutiles. Enfin, la fonction \texttt{generer\_configurations} répète la construction en changeant le capteur de départ afin d'obtenir plusieurs configurations différentes.
+% =========================================================
+\section{Programme linéaire}
 
-Cette méthode ne garantit pas de trouver toutes les configurations élémentaires possibles, mais elle permet d'obtenir rapidement un ensemble de configurations exploitables pour le programme linéaire.
-
-\section{Résolution du programme linéaire}
-
-Chaque configuration élémentaire générée est associée à une variable $t_i$. Cette variable représente le temps pendant lequel la configuration $u_i$ est activée.
-
-L'objectif est de maximiser la durée totale de surveillance :
+Chaque configuration élémentaire générée $u_i$ devient une variable continue $t_i \geq 0$, qui représente la durée d'activation de cette configuration. L'objectif est de maximiser la durée totale de surveillance :
 
 \[
-\max \sum_{i=1}^{k} t_i
+    \max \sum_{i=1}^{k} t_i
 \]
 
 où $k$ est le nombre de configurations générées.
 
-Pour chaque capteur $s_j$, on ajoute une contrainte de durée de vie :
+Pour chaque capteur $s_j$, la somme des temps d'activation des configurations dans lesquelles il apparaît ne doit pas dépasser sa durée de vie $T_j$ :
 
 \[
-\sum_{i : s_j \in u_i} t_i \leq T_j
+    \sum_{i\,:\,s_j \in u_i} t_i \leq T_j
 \]
 
-Ainsi, un capteur ne peut pas être utilisé plus longtemps que sa batterie ne le permet.
+Le programme Python lit les instances, génère les configurations, écrit automatiquement le fichier \texttt{programme.lp}, lance \texttt{glpsol}, puis lit la solution produite par GLPK.
 
-Le programme linéaire est écrit automatiquement dans un fichier \texttt{programme.lp}, puis il est résolu avec GLPK. La solution indique la durée maximale obtenue et le temps d'activation de chaque configuration.
-
+% =========================================================
 \section{Solutions obtenues}
 
-Les tests ont été réalisés sur les instances fournies. Le tableau suivant présente, pour chaque instance, le nombre de capteurs, le nombre de zones, le nombre de configurations élémentaires générées et la durée de vie obtenue après résolution.
+Pour les trois petites instances, nous avons lancé la génération exacte afin d'obtenir toutes les configurations élémentaires. Pour les deux grandes instances, nous avons lancé l'heuristique gloutonne, car l'énumération de toutes les combinaisons serait trop coûteuse.
 
 \begin{center}
 \small
-\renewcommand{\arraystretch}{1.15}
-\begin{tabular}{|l|c|c|c|c|}
-\hline
-\textbf{Instance} & \textbf{Capteurs} & \textbf{Zones} & \textbf{Config.} & \textbf{Durée} \\
-\hline
-fichier-exemple & 4 & 3 & 4 & $8{,}5$ \\
-\hline
-moyen\_test\_3 & 10 & 10 & 15 & $395$ \\
-\hline
-moyen\_test\_2 & 20 & 10 & 21 & $104$ \\
-\hline
-gros\_test\_1 & 100 & 200 & 265 & $1668$ \\
-\hline
-maxi\_test\_1 & 1000 & 500 & 12985 & $13711$ \\
-\hline
+\renewcommand{\arraystretch}{1.22}
+\begin{tabular}{@{}lrrrrl@{}}
+\toprule
+\textbf{Instance} & \textbf{Capteurs} & \textbf{Zones} & \textbf{Config.} & \textbf{Durée} & \textbf{Méthode} \\
+\midrule
+fichier-exemple & 4 & 3 & 4 & $8{,}5$ & exacte \\
+moyen\_test\_3 & 10 & 10 & 19 & $395$ & exacte \\
+moyen\_test\_2 & 20 & 10 & 238 & $104$ & exacte \\
+gros\_test\_1 & 100 & 200 & 89 & $1130$ & gloutonne \\
+maxi\_test\_1 & 1000 & 500 & 1541 & $4874$ & gloutonne \\
+\bottomrule
 \end{tabular}
 \end{center}
 
-Pour l'instance d'exemple, la solution optimale théorique est de $8{,}5$ unités de temps lorsque les configurations élémentaires $(2,4)$, $(1,2)$, $(1,3)$ et $(1,4)$ sont utilisées. Cette instance permet de vérifier que la construction du programme linéaire et l'interprétation de la solution sont correctes.
+Sur l'instance d'exemple, les quatre configurations élémentaires $(1,2)$, $(1,3)$, $(1,4)$ et $(2,4)$ sont retrouvées. GLPK obtient donc la durée optimale attendue de $8{,}5$ unités de temps.
 
-\section{Analyse des résultats}
+% =========================================================
+\section{Influence des configurations et analyse}
 
-Les résultats montrent que la qualité de la solution dépend directement des configurations élémentaires générées. Si le nombre de configurations est trop faible, le solveur a peu de choix pour répartir l'utilisation des capteurs. La durée de vie obtenue peut donc être inférieure à la durée optimale réelle.
-
-À l'inverse, lorsque les configurations sont plus nombreuses et plus variées, le solveur dispose de davantage de possibilités. Il peut alors mieux répartir la consommation d'énergie entre les capteurs et augmenter la durée totale de surveillance.
-
-Cependant, ajouter trop de configurations augmente aussi la taille du programme linéaire. Le nombre de variables augmente, le fichier \texttt{programme.lp} devient plus grand et le temps de résolution peut augmenter. Il faut donc trouver un compromis entre la qualité de la solution et le temps de calcul.
-
-Notre heuristique gloutonne permet d'obtenir rapidement des configurations élémentaires. Elle est donc adaptée aux instances moyennes et grandes, même si elle ne garantit pas d'obtenir toutes les configurations possibles.
+Pour mesurer l'influence du nombre et du type des configurations, nous avons comparé les résultats des deux méthodes sur les petites instances.
 
 \begin{center}
 \small
-\renewcommand{\arraystretch}{1.15}
-\begin{tabular}{|c|c|c|}
-\hline
-\textbf{Nombre de configurations} & \textbf{Durée obtenue} & \textbf{Observation} \\
-\hline
-Faible & généralement plus faible & peu de choix pour GLPK \\
-\hline
-Moyen & généralement améliorée & meilleur compromis \\
-\hline
-Élevé & potentiellement meilleure & solution parfois meilleure mais calcul plus long \\
-\hline
+\renewcommand{\arraystretch}{1.22}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+ & \multicolumn{2}{c}{\textbf{Exacte}} & \multicolumn{2}{c}{\textbf{Gloutonne}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+\textbf{Instance} & \textbf{Config.} & \textbf{Durée} & \textbf{Config.} & \textbf{Durée} \\
+\midrule
+fichier-exemple & 4 & $8{,}5$ & 4 & $8{,}5$ \\
+moyen\_test\_3 & 19 & $395$ & 11 & $382$ \\
+moyen\_test\_2 & 238 & $104$ & 20 & $104$ \\
+\bottomrule
 \end{tabular}
 \end{center}
 
-\section{Conclusion}
+Ces résultats montrent que le nombre de configurations n'est pas le seul facteur important : leur pertinence compte également. Pour \texttt{moyen\_test\_2}, seulement 20 configurations gloutonnes suffisent à atteindre la même durée que les 238 configurations exactes. À l'inverse, pour \texttt{moyen\_test\_3}, certaines configurations utiles ne sont pas produites par l'heuristique gloutonne et la durée passe de $395$ à $382$.
 
-Le programme réalisé permet de lire une instance, de construire des configurations élémentaires, d'écrire le programme linéaire correspondant et de le résoudre avec GLPK. Les expérimentations montrent que le choix des configurations a une influence importante sur la durée de vie du réseau. Plus les configurations sont pertinentes et variées, meilleure peut être la solution obtenue.
+La génération exacte garantit la meilleure durée, car elle fournit toutes les configurations élémentaires au solveur. En revanche, elle devient rapidement trop coûteuse lorsque le nombre de capteurs augmente. L'heuristique gloutonne fournit une solution plus rapidement sur les grandes instances, mais sans garantie d'optimalité. Notre approche consiste donc à utiliser la méthode exacte lorsque cela reste raisonnable, puis la méthode gloutonne lorsque la taille de l'instance rend l'énumération exhaustive impraticable.
 
 \end{document}

@@ -2,8 +2,7 @@ def zones_couvertes(configuration, couvertures):
     zones = set()
 
     for capteur in configuration:
-        indice_capteur = capteur - 1
-        zones.update(couvertures[indice_capteur])
+        zones.update(couvertures[capteur - 1])
 
     return zones
 
@@ -18,15 +17,10 @@ def rendre_elementaire(configuration, couvertures, nb_zones):
 
     for capteur in configuration.copy():
         configuration_test = configuration_elementaire.copy()
+
         configuration_test.remove(capteur)
 
-        capteur_est_inutile = couvre_toutes_les_zones(
-            configuration_test,
-            couvertures,
-            nb_zones
-        )
-
-        if capteur_est_inutile:
+        if couvre_toutes_les_zones(configuration_test, couvertures, nb_zones):
             configuration_elementaire.remove(capteur)
 
     return configuration_elementaire

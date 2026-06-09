@@ -6,7 +6,7 @@ def resoudre_avec_glpk(fichier_lp, fichier_solution):
 
     try:
         resultat = subprocess.run(commande, capture_output=True, text=True)
-    except FileNotFoundError:
+    except OSError:
         print("Erreur : GLPK n'est pas installé ou glpsol est introuvable.")
         return False
 

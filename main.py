@@ -11,12 +11,19 @@ def lire_arguments():
     parser = argparse.ArgumentParser(
         description="Maximise la durée de vie d'un réseau de capteurs."
     )
+
     parser.add_argument(
         "instance",
-        nargs="?",
-        default="instances/fichier-exemple.txt",
-        help="fichier d'instance à résoudre (défaut : instances/fichier-exemple.txt)",
+        help="fichier d'instance à résoudre"
     )
+
+    parser.add_argument(
+        "--methode",
+        choices=["exacte", "gloutonne"],
+        required=True,
+        help="méthode de génération des configurations"
+    )
+
     return parser.parse_args()
 
 
@@ -37,7 +44,12 @@ def main():
     afficher_instance(nb_capteurs, nb_zones, durees_vie, couvertures)
 
     print("\nGénération des configurations en cours...")
-    configurations = generer_configurations(nb_capteurs, nb_zones, couvertures)
+    configurations = generer_configurations(
+        nb_capteurs,
+        nb_zones,
+        couvertures,
+        arguments.methode
+    )
     print("Génération terminée.")
     afficher_configurations(configurations)
 
