@@ -1,0 +1,135 @@
+\documentclass[10pt,a4paper]{article}
+
+% =========================
+% Packages
+% =========================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{microtype}
+\usepackage{indentfirst}
+
+% =========================
+% Mise en page
+% =========================
+\geometry{
+    top=1.6cm,
+    bottom=1.6cm,
+    left=1.7cm,
+    right=1.7cm
+}
+
+\setlength{\parindent}{0.6cm}
+\setlength{\parskip}{4pt}
+\linespread{1.03}
+
+\setlist[itemize]{
+    noitemsep,
+    topsep=3pt,
+    leftmargin=7mm
+}
+
+\setlist[enumerate]{
+    noitemsep,
+    topsep=3pt,
+    leftmargin=8mm
+}
+
+% Espacement des titres
+\titlespacing*{\section}{0pt}{10pt}{6pt}
+
+% Style des titres
+\titleformat{\section}
+{\normalfont\large\bfseries}
+{\thesection}
+{0.6em}
+{}
+
+\pagestyle{empty}
+
+% =========================
+% Titre
+% =========================
+\title{\vspace{-0.8cm}\textbf{Problème d'activation de capteurs}}
+\author{Floryan BORNET -- Corentin BRENDLÉ}
+\date{Techniques d'optimisation}
+
+\begin{document}
+
+\maketitle
+\vspace{-0.5cm}
+
+% =========================================================
+\section{Construction des configurations élémentaires}
+
+Une configuration correspond à un ensemble de capteurs activés en même temps. Elle est valide si elle couvre toutes les zones à surveiller. Elle est élémentaire si elle est valide et si aucun capteur ne peut être retiré sans perdre cette couverture.
+
+Nous avons implémenté deux méthodes de construction des configurations élémentaires, choisies explicitement au lancement du programme avec l'option \texttt{--methode}.
+
+\textbf{Génération exacte.}
+Cette méthode teste toutes les combinaisons possibles de capteurs, puis conserve uniquement les configurations élémentaires. Une combinaison est gardée si elle couvre toutes les zones et si le retrait de n'importe lequel de ses capteurs rend la couverture incomplète. Cette méthode permet d'obtenir toutes les configurations élémentaires, mais son coût augmente fortement car il peut y avoir jusqu'à $2^N-1$ combinaisons à tester.
+
+\textbf{Heuristique gloutonne.}
+Cette méthode est utilisée pour obtenir des configurations sans énumérer directement toutes les combinaisons de capteurs. Pour chaque capteur de départ, le programme ajoute successivement les capteurs qui couvrent le plus grand nombre de nouvelles zones non encore couvertes. En cas d'égalité, toutes les possibilités ex æquo sont explorées récursivement. Une fois toutes les zones couvertes, les capteurs devenus inutiles sont supprimés et les doublons sont retirés.
+
+Cette méthode ne garantit pas de trouver toutes les configurations élémentaires. Elle produit davantage de configurations pertinentes que la version qui ne conservait que le premier et le dernier capteur ex æquo, mais l'exploration de toutes les égalités peut devenir coûteuse sur les très grandes instances.
+
+% =========================================================
+\section{Solutions obtenues sur les instances}
+
+Une fois les configurations élémentaires générées, elles sont données à GLPK sous forme d'un programme linéaire. Chaque configuration $u_i$ est associée à une variable $t_i$, qui représente son temps d'activation. La durée totale à maximiser est donc la somme des temps d'activation des configurations.
+
+Nous avons utilisé l'heuristique gloutonne sur toutes les instances. Elle permet d'utiliser la même méthode quelle que soit la taille du problème, sans devoir énumérer toutes les combinaisons de capteurs.
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}lrrrrl@{}}
+\toprule
+\textbf{Instance} & \textbf{Capteurs} & \textbf{Zones} & \textbf{Config.} & \textbf{Durée obt.} & \textbf{Méthode} \\
+\midrule
+fichier-exemple & 4 & 3 & 4 & $8{,}5$ & gloutonne \\
+moyen\_test\_3 & 10 & 10 & 17 & $395$ & gloutonne \\
+moyen\_test\_2 & 20 & 10 & 63 & $104$ & gloutonne \\
+gros\_test\_1 & 100 & 200 & 393 & $1\,289$ & gloutonne \\
+maxi\_test\_1 & $1\,000$ & 500 & $35\,903$ & $7\,335$ & gloutonne \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Sur l'instance d'exemple, les quatre configurations élémentaires $\{1,2\}$, $\{1,3\}$, $\{1,4\}$ et $\{2,4\}$ sont retrouvées. GLPK obtient donc la durée optimale attendue de $8{,}5$ unités de temps.
+
+\newpage
+
+% =========================================================
+\section{Influence des configurations et analyse}
+
+Pour mesurer l'influence du nombre et du type des configurations, nous avons comparé les résultats des deux méthodes sur les petites instances.
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+ & \multicolumn{2}{c}{\textbf{Exacte}} & \multicolumn{2}{c}{\textbf{Gloutonne}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+\textbf{Instance} & \textbf{Config.} & \textbf{Durée obt.} & \textbf{Config.} & \textbf{Durée obt.} \\
+\midrule
+fichier-exemple & 4 & $8{,}5$ & 4 & $8{,}5$ \\
+moyen\_test\_3 & 19 & $395$ & 17 & $395$ \\
+moyen\_test\_2 & 238 & $104$ & 63 & $104$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Ces résultats montrent que le nombre de configurations n'est pas le seul facteur important : leur pertinence compte également. Pour \texttt{moyen\_test\_2}, seulement 63 configurations gloutonnes suffisent à atteindre la même durée que les 238 configurations exactes. Pour \texttt{moyen\_test\_3}, les 17 configurations gloutonnes permettent également d'atteindre la durée optimale de $395$, obtenue avec 19 configurations exactes.
+
+La génération exacte fournit toutes les configurations élémentaires au solveur, mais elle devient rapidement trop coûteuse lorsque le nombre de capteurs augmente. L'heuristique gloutonne ne garantit pas toujours l'optimalité, mais elle atteint ici les mêmes durées que la méthode exacte sur les trois petites instances. Elle peut donc être utilisée sur toutes les instances. Sur \texttt{gros\_test\_1}, elle génère 393 configurations et atteint une durée de $1\,289$. Sur \texttt{maxi\_test\_1}, elle génère $35\,903$ configurations et atteint une durée de $7\,335$, au prix d'un temps de génération plus important.
+
+\end{document}
