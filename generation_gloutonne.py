@@ -2,23 +2,32 @@ from couverture import rendre_elementaire, couvre_toutes_les_zones
 
 
 def compter_nouvelles_zones(capteur, zones_deja_couvertes, couvertures):
-    """Compte combien de nouvelles zones sont couvertes par ce capteur."""
+    """
+    Compte combien de nouvelles zones sont couvertes par ce capteur.
+    """
+
+    nombre_nouvelles_zones = 0
     zones_du_capteur = couvertures[capteur - 1]
-    return len(zones_du_capteur - zones_deja_couvertes)
+
+    for zone in zones_du_capteur:
+        if zone not in zones_deja_couvertes:
+            nombre_nouvelles_zones = nombre_nouvelles_zones + 1
+
+    return nombre_nouvelles_zones
 
 
-def choisir_capteur_qui_couvre_le_plus(
+def trouver_capteurs_qui_couvrent_le_plus(
     nb_capteurs,
     capteurs_choisis,
     zones_deja_couvertes,
-    couvertures,
-    choisir_dernier_en_cas_egalite
+    couvertures
 ):
     """
-    Choisit le capteur qui couvre le plus de nouvelles zones.
+    Retourne tous les capteurs qui couvrent le plus de nouvelles zones.
 
-    En cas d'egalite, on choisit soit le premier, soit le dernier.
+    S'il y a plusieurs capteurs ex aequo, on les garde tous.
     """
+
     meilleurs_capteurs = []
     meilleur_nombre_zones = 0
 
@@ -33,76 +42,102 @@ def choisir_capteur_qui_couvre_le_plus(
             if nombre_zones > meilleur_nombre_zones:
                 meilleur_nombre_zones = nombre_zones
                 meilleurs_capteurs = [capteur]
+
             elif nombre_zones == meilleur_nombre_zones and nombre_zones > 0:
                 meilleurs_capteurs.append(capteur)
 
-    if len(meilleurs_capteurs) == 0:
-        return None
-
-    if choisir_dernier_en_cas_egalite:
-        return meilleurs_capteurs[-1]
-
-    return meilleurs_capteurs[0]
+    return meilleurs_capteurs
 
 
 def ajouter_zones_du_capteur(capteur, zones_deja_couvertes, couvertures):
-    """Ajoute les zones couvertes par un capteur."""
-    zones_deja_couvertes.update(couvertures[capteur - 1])
+    """
+    Ajoute les zones couvertes par un capteur dans la liste
+    des zones deja couvertes.
+    """
+
+    zones_du_capteur = couvertures[capteur - 1]
+
+    for zone in zones_du_capteur:
+        if zone not in zones_deja_couvertes:
+            zones_deja_couvertes.append(zone)
 
 
-def construire_configuration_gloutonne(
-    capteur_depart,
+def construire_configurations_gloutonnes(
+    configuration,
+    capteurs_choisis,
+    zones_deja_couvertes,
     nb_capteurs,
     nb_zones,
-    couvertures,
-    choisir_dernier_en_cas_egalite
+    couvertures
 ):
-    """Construit une configuration avec la methode gloutonne."""
-    configuration = [capteur_depart]
-    capteurs_choisis = {capteur_depart}
-    zones_deja_couvertes = set()
+    """
+    Construit une ou plusieurs configurations avec la methode gloutonne.
 
-    ajouter_zones_du_capteur(
-        capteur_depart,
+    A chaque etape, on garde tous les capteurs ex aequo
+    qui couvrent le plus de nouvelles zones.
+    """
+
+    if len(zones_deja_couvertes) == nb_zones:
+        configuration_elementaire = rendre_elementaire(
+            configuration,
+            couvertures,
+            nb_zones
+        )
+
+        configuration_elementaire.sort()
+        return [configuration_elementaire]
+
+    meilleurs_capteurs = trouver_capteurs_qui_couvrent_le_plus(
+        nb_capteurs,
+        capteurs_choisis,
         zones_deja_couvertes,
         couvertures
     )
 
-    while len(zones_deja_couvertes) < nb_zones:
-        capteur_a_ajouter = choisir_capteur_qui_couvre_le_plus(
-            nb_capteurs,
-            capteurs_choisis,
-            zones_deja_couvertes,
-            couvertures,
-            choisir_dernier_en_cas_egalite
-        )
+    if len(meilleurs_capteurs) == 0:
+        return []
 
-        if capteur_a_ajouter is None:
-            return None
+    configurations_trouvees = []
 
-        configuration.append(capteur_a_ajouter)
-        capteurs_choisis.add(capteur_a_ajouter)
+    for capteur in meilleurs_capteurs:
+        nouvelle_configuration = configuration.copy()
+        nouveaux_capteurs_choisis = capteurs_choisis.copy()
+        nouvelles_zones_couvertes = zones_deja_couvertes.copy()
+
+        nouvelle_configuration.append(capteur)
+        nouveaux_capteurs_choisis.append(capteur)
+
         ajouter_zones_du_capteur(
-            capteur_a_ajouter,
-            zones_deja_couvertes,
+            capteur,
+            nouvelles_zones_couvertes,
             couvertures
         )
 
-    configuration = rendre_elementaire(configuration, couvertures, nb_zones)
-    configuration.sort()
-    return configuration
+        configurations_suivantes = construire_configurations_gloutonnes(
+            nouvelle_configuration,
+            nouveaux_capteurs_choisis,
+            nouvelles_zones_couvertes,
+            nb_capteurs,
+            nb_zones,
+            couvertures
+        )
+
+        for config in configurations_suivantes:
+            configurations_trouvees.append(config)
+
+    return configurations_trouvees
 
 
 def generer_configurations_gloutonnes(nb_capteurs, nb_zones, couvertures):
     """
-    Genere deux configurations par capteur de depart.
+    Genere des configurations elementaires avec une methode gloutonne.
 
-    En cas d'egalite, la premiere choisit le premier capteur possible
-    et la seconde choisit le dernier.
+    Pour chaque capteur de depart, on construit les configurations possibles.
+    A chaque etape, si plusieurs capteurs couvrent le meme meilleur nombre
+    de nouvelles zones, on les teste tous.
     """
+
     configurations = []
-    configurations_connues = set()
-    couvertures = [set(zones) for zones in couvertures]
 
     for capteur_depart in range(1, nb_capteurs + 1):
         if capteur_depart % 100 == 0:
@@ -114,21 +149,30 @@ def generer_configurations_gloutonnes(nb_capteurs, nb_zones, couvertures):
                 "capteurs de depart testes"
             )
 
-        for choisir_dernier in [False, True]:
-            configuration = construire_configuration_gloutonne(
-                capteur_depart,
-                nb_capteurs,
-                nb_zones,
-                couvertures,
-                choisir_dernier
-            )
+        configuration_depart = [capteur_depart]
+        capteurs_choisis = [capteur_depart]
+        zones_deja_couvertes = []
 
-            if configuration is not None:
-                if couvre_toutes_les_zones(configuration, couvertures, nb_zones):
-                    cle_configuration = tuple(configuration)
+        ajouter_zones_du_capteur(
+            capteur_depart,
+            zones_deja_couvertes,
+            couvertures
+        )
 
-                    if cle_configuration not in configurations_connues:
-                        configurations_connues.add(cle_configuration)
-                        configurations.append(configuration)
+        configurations_trouvees = construire_configurations_gloutonnes(
+            configuration_depart,
+            capteurs_choisis,
+            zones_deja_couvertes,
+            nb_capteurs,
+            nb_zones,
+            couvertures
+        )
+
+        for configuration in configurations_trouvees:
+            if couvre_toutes_les_zones(configuration, couvertures, nb_zones):
+                configuration.sort()
+
+                if configuration not in configurations:
+                    configurations.append(configuration)
 
     return configurations

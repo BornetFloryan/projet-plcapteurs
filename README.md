@@ -55,27 +55,26 @@ Elle part d'un capteur de départ, puis ajoute à chaque étape le capteur qui c
 Cette méthode est plus rapide, mais elle ne garantit pas de trouver toutes les configurations élémentaires possibles.
 
 Sur les grandes instances, une progression est affichée tous les 100 capteurs de
-départ testés. À titre indicatif, `maxi_test_1` termine en environ 20 secondes
-sur la machine utilisée pour le projet.
+départ testés.
 
 ## Lancer les instances
 
 ### Instance 1 : fichier-exemple
 
 ```powershell
-python main.py instances/fichier-exemple.txt --methode exacte
+python main.py instances/fichier-exemple.txt --methode gloutonne
 ```
 
 ### Instance 2 : moyen_test_2
 
 ```powershell
-python main.py instances/moyen_test_2.txt --methode exacte
+python main.py instances/moyen_test_2.txt --methode gloutonne
 ```
 
 ### Instance 3 : moyen_test_3
 
 ```powershell
-python main.py instances/moyen_test_3.txt --methode exacte
+python main.py instances/moyen_test_3.txt --methode gloutonne
 ```
 
 ### Instance 4 : gros_test_1
@@ -90,19 +89,17 @@ python main.py instances/gros_test_1.txt --methode gloutonne
 python main.py instances/maxi_test_1.txt --methode gloutonne
 ```
 
-## Pourquoi utiliser deux méthodes ?
+## Méthode utilisée
 
-La méthode exacte est utilisée sur les petites instances, car elle permet d'obtenir toutes les configurations élémentaires.
+La méthode gloutonne peut être utilisée sur toutes les instances. Elle permet
+d'obtenir rapidement des configurations utiles sans tester toutes les
+combinaisons possibles.
 
-Pour les grandes instances, le nombre de combinaisons devient trop important. On utilise donc la méthode gloutonne afin d'obtenir rapidement des configurations exploitables.
+La méthode exacte reste disponible pour comparer les résultats sur les petites
+instances, mais elle devient trop coûteuse lorsque le nombre de capteurs
+augmente.
 
-Le choix de la méthode est fait explicitement dans la commande avec l'option :
-
-```powershell
---methode exacte
-```
-
-ou :
+Pour résoudre une instance, on utilise donc l'option :
 
 ```powershell
 --methode gloutonne
